@@ -26,34 +26,36 @@ def find_document_contour(edges):
 
     return None
 
-def warp_perspective(image, contour):
-    pts = contour.reshape(4, 2)
 
-    # Sort the points properly
+def order_points(pts):
+    """ Sort points in order: top-left, top-right, bottom-right, bottom-left """
     rect = np.zeros((4, 2), dtype="float32")
+
     s = pts.sum(axis=1)
     rect[0] = pts[np.argmin(s)]  # Top-left
     rect[2] = pts[np.argmax(s)]  # Bottom-right
+
     diff = np.diff(pts, axis=1)
     rect[1] = pts[np.argmin(diff)]  # Top-right
     rect[3] = pts[np.argmax(diff)]  # Bottom-left
 
-    (tl, tr, br, bl) = rect
+    return rect
 
-    # Compute width and height properly
+def warp_perspective(image, contour):
+    pts = contour.reshape(4, 2)
+    rect = order_points(pts)
+
+    # Compute proper width & height
+    (tl, tr, br, bl) = rect
     widthA = np.linalg.norm(br - bl)
     widthB = np.linalg.norm(tr - tl)
-    maxWidth = max(int(widthA), int(widthB))
+    maxWidth = int(max(widthA, widthB))
 
     heightA = np.linalg.norm(tr - br)
     heightB = np.linalg.norm(tl - bl)
-    maxHeight = max(int(heightA), int(heightB))
+    maxHeight = int(max(heightA, heightB))
 
-    # Ensure dimensions are within reasonable limits
-    maxWidth = min(maxWidth, image.shape[1])
-    maxHeight = min(maxHeight, image.shape[0])
-
-    # Define new perspective transform destination
+    # Destination points for warped image
     dst = np.array([
         [0, 0],
         [maxWidth - 1, 0],
@@ -61,7 +63,7 @@ def warp_perspective(image, contour):
         [0, maxHeight - 1]
     ], dtype="float32")
 
-    # Apply the perspective transform
+    # Perspective Transform
     matrix = cv2.getPerspectiveTransform(rect, dst)
     warped = cv2.warpPerspective(image, matrix, (maxWidth, maxHeight))
 
